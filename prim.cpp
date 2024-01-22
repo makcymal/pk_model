@@ -8,15 +8,12 @@ void get_input(vector<string> &verts, map<string, int> &popul, map<string, int> 
     int int_input;
 
     ifstream verts_popul, edges;
-    verts_popul.open("pk_model/graph_coord_population.txt");
+    verts_popul.open("pk_model/graph_popul.txt");
     edges.open("pk_model/graph_edges.txt");
 
     // get vertex
     while (verts_popul >> str_input) {
         verts.push_back(str_input);
-        // ignore coords
-        verts_popul >> str_input;
-        verts_popul >> str_input;
         // get population
         verts_popul >> int_input;
         popul[verts.back()] = int_input;
