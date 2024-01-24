@@ -43,8 +43,17 @@ void get_input(vector<string> &verts, map<string, int> &popul, map<string, int> 
 }
 
 
-string fmt_idx(int index) {
-    return (index < 10 ? "0" : "") + to_string(index);
+void get_abbrev(map<string, string> &abbrev) {
+    ifstream abbrev_file;
+    abbrev_file.open("pk_model/abbreviations.txt");
+    string full_name, short_name;
+
+    while (abbrev_file >> full_name) {
+        abbrev_file >> short_name;
+        abbrev[full_name] = short_name;
+    }
+
+    abbrev_file.close();
 }
 
 
@@ -66,6 +75,9 @@ int main() {
 
     get_input(verts, popul, index, dist);
 
+    map<string, string> abbrev;
+    get_abbrev(abbrev);
+
     const int N = verts.size();
     string src = "Владивосток", dst = "Находка";
     int src_idx = index[src], dst_idx = index[dst];
@@ -78,39 +90,41 @@ int main() {
     statement << "ROWS\n";
 
     // function to minimize
-    statement << " N\tCOST\n";
+    statement << " N\tTARGET\n";
 
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
             if (dist[r][c] > 0) {
-                statement << " L  ED" << fmt_idx(r) << fmt_idx(c) << '\n';
+                statement << " L  MAX_" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << '\n';
             }
         }
     }
 
     for (int i = 0; i < N; ++i) {
         if (i != src_idx and i != dst_idx)
-            statement << " E  VERT" << fmt_idx(i) << '\n';
+            statement << " E  INOUT_" << abbrev[verts[i]] << '\n';
     }
-    statement << " E  SRCDST\n";
+    statement << " E  ENDS_" << abbrev[src] << '_' << abbrev[dst] << '\n';
 
     statement << "COLUMNS\n";
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
             if (dist[r][c] > 0) {
-                string var = "\tFL" + fmt_idx(r) + fmt_idx(c);
-                statement << var << "\t\tCOST\t\t-1\n";
-                statement << var << "\t\tED" << fmt_idx(r) << fmt_idx(c) << "\t\t1\n";
+                string var = "\t" + abbrev[verts[r]] + '_' + abbrev[verts[c]];
+                statement << var << "\t\tTARGET\t\t\t\t-1\n";
+                statement << var << "\t\tMAX_" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t\t1\n";
                 
                 if (c == src_idx or r == dst_idx) continue;
                 
                 if (r != src_idx and c != dst_idx){
-                    statement << var << "\t\tVERT" << fmt_idx(r) << "\t\t-1\n";
-                    statement << var << "\t\tVERT" << fmt_idx(c) << "\t\t1\n";
+                    statement << var << "\t\tINOUT_" << abbrev[verts[r]] << "\t\t\t-1\n";
+                    statement << var << "\t\tINOUT_" << abbrev[verts[c]] << "\t\t\t1\n";
                 } else if (r == src_idx) {
-                    statement << var << "\t\tSRCDST" << "\t\t-1\n";
+                    statement << var << "\t\tENDS_" << abbrev[src] << '_' << abbrev[dst] << "\t\t-1\n";
+                    statement << var << "\t\tINOUT_" << abbrev[verts[c]] << "\t\t\t1\n";
                 } else if (c == dst_idx) {
-                    statement << var << "\t\tSRCDST" << "\t\t1\n";
+                    statement << var << "\t\tINOUT_" << abbrev[verts[r]] << "\t\t\t-1\n";
+                    statement << var << "\t\tENDS_" << abbrev[src] << '_' << abbrev[dst] << "\t\t1\n";
                 }
             }
         }
@@ -121,7 +135,7 @@ int main() {
         for (int c = 0; c < N; ++c) {
             if (dist[r][c] > 0) {
                 int cap = ((r < 10 or c < 10) ? 3 : 2) * 150 * dist[r][c];
-                statement << "\tRHS1\t\tED" << fmt_idx(r) << fmt_idx(c) << "\t\t" << cap << '\n';
+                statement << "\tMAX\t\tMAX_" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t\t" << cap << '\n';
             }
         }
     }
