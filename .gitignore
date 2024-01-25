@@ -1,2 +1,4 @@
-prim
 *.pdf
+*.mps
+*.presol
+*.nopresol

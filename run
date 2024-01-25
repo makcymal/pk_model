@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if g++ main.cpp -o main
+then
+./main
+rm main
+else
+echo "An error while compilation occured"
+exit 1
+fi
+
+dis=$(glpsol main.mps --max --presol -o out.presol)
+rm -f protocol.presol
+echo $dis >> protocol.presol
+
+dis=$(glpsol main.mps --max --nopresol -o out.nopresol)
+rm -f protocol.nopresol
+echo $dis >> protocol.nopresol
