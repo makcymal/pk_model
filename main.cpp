@@ -110,6 +110,7 @@ int main() {
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
             if (c == src_idx or r == dst_idx) continue;
+
             if (dist[r][c] > 0) {
                 mps << " L  MAX_" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << '\n';
             }
@@ -128,19 +129,22 @@ int main() {
             if (dist[r][c] > 0) {
                 if (c == src_idx or r == dst_idx) continue;
 
-                string var = "\t" + abbrev[verts[r]] + '_' + abbrev[verts[c]];
-                mps << var << "\t\tTARGET\t\t1\n";
-                mps << var << "\t\tMAX_" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t\t1\n";
+                string var = "\t" + abbrev[verts[r]] + '_' + abbrev[verts[c]] + "\t\t";
+
+                if (r == src_idx)
+                    mps << var << "TARGET\t\t\t1\n";
+
+                mps << var << "MAX_" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t1\n";
                 
                 if (r != src_idx and c != dst_idx){
-                    mps << var << "\t\tINOUT_" << abbrev[verts[r]] << "\t\t-1\n";
-                    mps << var << "\t\tINOUT_" << abbrev[verts[c]] << "\t\t1\n";
+                    mps << var << "INOUT_" << abbrev[verts[r]] << "\t\t-1\n";
+                    mps << var << "INOUT_" << abbrev[verts[c]] << "\t\t1\n";
                 } else if (r == src_idx) {
-                    mps << var << "\t\tENDS_" << abbrev[src] << '_' << abbrev[dst] << "\t-1\n";
-                    mps << var << "\t\tINOUT_" << abbrev[verts[c]] << "\t\t1\n";
+                    mps << var << "ENDS_" << abbrev[src] << '_' << abbrev[dst] << "\t-1\n";
+                    mps << var << "INOUT_" << abbrev[verts[c]] << "\t\t1\n";
                 } else if (c == dst_idx) {
-                    mps << var << "\t\tINOUT_" << abbrev[verts[r]] << "\t\t-1\n";
-                    mps << var << "\t\tENDS_" << abbrev[src] << '_' << abbrev[dst] << "\t1\n";
+                    mps << var << "INOUT_" << abbrev[verts[r]] << "\t\t-1\n";
+                    mps << var << "ENDS_" << abbrev[src] << '_' << abbrev[dst] << "\t1\n";
                 }
             }
         }
@@ -150,6 +154,7 @@ int main() {
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
             if (c == src_idx or r == dst_idx) continue;
+
             if (dist[r][c] > 0) {
                 int cap = dist[r][c];
                 // int cap = ((r < 10 or c < 10) ? 3 : 2) * 150 * dist[r][c];
