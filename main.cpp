@@ -2,7 +2,8 @@
 
 using namespace std;
 
-const string PATH = "exp_model_2/";
+const string PATH = "pk_model/";
+// const string PATH = "exp_model_3/";
 
 
 void read_graph(vector<string> &verts, map<string, int> &popul, map<string, int> &index, vector<vector<int>> &dist) {
@@ -38,8 +39,8 @@ void read_graph(vector<string> &verts, map<string, int> &popul, map<string, int>
         int v2 = index[str_input];
         edges_file >> int_input;
 
-        // dist[v1][v2] = dist[v2][v1] = int_input;
-        dist[v1][v2] = int_input;
+        dist[v1][v2] = dist[v2][v1] = int_input;
+        // dist[v1][v2] = int_input;
     }
 
     popul_file.close();
