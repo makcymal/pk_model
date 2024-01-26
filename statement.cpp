@@ -99,66 +99,53 @@ int main() {
     int src_idx = index[src], dst_idx = index[dst];
 
     ofstream mps;
-    mps.open("main.mps");
+    mps.open("statement.mps");
 
     mps << "NAME          PK_ROADS\n";
     mps << "ROWS\n";
 
     // function to minimize
-    mps << " N\tTARGET\n";
-
-    for (int r = 0; r < N; ++r) {
-        for (int c = 0; c < N; ++c) {
-            if (c == src_idx or r == dst_idx) continue;
-
-            if (dist[r][c] > 0) {
-                mps << " L  MAX_" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << '\n';
-            }
-        }
-    }
+    mps << " N\tMAXFLOW\n";
 
     for (int i = 0; i < N; ++i) {
         if (i != src_idx and i != dst_idx)
-            mps << " E  INOUT_" << abbrev[verts[i]] << '\n';
+            mps << " E  IO_" << abbrev[verts[i]] << '\n';
     }
-    mps << " E  ENDS_" << abbrev[src] << '_' << abbrev[dst] << '\n';
+    mps << " E  SRC_DST\n";
 
     mps << "COLUMNS\n";
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
-            if (dist[r][c] > 0) {
-                if (c == src_idx or r == dst_idx) continue;
-
+            if (dist[r][c] > 0 and c != src_idx and r != dst_idx) {
                 string var = "\t" + abbrev[verts[r]] + '_' + abbrev[verts[c]] + "\t\t";
 
-                if (r == src_idx)
-                    mps << var << "TARGET\t\t\t1\n";
-
-                mps << var << "MAX_" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t1\n";
+                if (r == src_idx){
+                    mps << var << "MAXFLOW\t\t\t1\n";
+                    if (c == dst_idx) continue;
+                }
                 
                 if (r != src_idx and c != dst_idx){
-                    mps << var << "INOUT_" << abbrev[verts[r]] << "\t\t-1\n";
-                    mps << var << "INOUT_" << abbrev[verts[c]] << "\t\t1\n";
+                    mps << var << "IO_" << abbrev[verts[r]] << "\t\t\t-1\n";
+                    mps << var << "IO_" << abbrev[verts[c]] << "\t\t\t1\n";
                 } else if (r == src_idx) {
-                    mps << var << "ENDS_" << abbrev[src] << '_' << abbrev[dst] << "\t-1\n";
-                    mps << var << "INOUT_" << abbrev[verts[c]] << "\t\t1\n";
+                    mps << var << "SRC_DST" << "\t\t\t-1\n";
+                    mps << var << "IO_" << abbrev[verts[c]] << "\t\t\t1\n";
                 } else if (c == dst_idx) {
-                    mps << var << "INOUT_" << abbrev[verts[r]] << "\t\t-1\n";
-                    mps << var << "ENDS_" << abbrev[src] << '_' << abbrev[dst] << "\t1\n";
+                    mps << var << "IO_" << abbrev[verts[r]] << "\t\t\t-1\n";
+                    mps << var << "SRC_DST" << "\t\t\t1\n";
                 }
             }
         }
     }
 
-    mps << "RHS\n";
+    mps << "BOUNDS\n";
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
-            if (c == src_idx or r == dst_idx) continue;
-
-            if (dist[r][c] > 0) {
+            if (dist[r][c] > 0 and c != src_idx and r != dst_idx) {
                 int cap = dist[r][c];
                 // int cap = ((r < 10 or c < 10) ? 3 : 2) * 150 * dist[r][c];
-                mps << "\tMAX\t\tMAX_" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t\t" << cap << '\n';
+                mps << " UP FLOW\t\t\t" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t\t" << cap << '\n';
+                mps << " LO FLOW\t\t\t" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t\t0\n";
             }
         }
     }

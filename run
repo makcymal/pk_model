@@ -1,18 +1,27 @@
 #!/bin/bash
 
-if g++ main.cpp -o main
+if g++ statement.cpp -o statement
 then
-./main
-rm main
+./statement
+rm statement
 else
-echo "An error while compilation occured"
+echo "An error while compilation statement.cpp occured"
 exit 1
 fi
 
-dis=$(glpsol main.mps --max --presol -o out.presol)
+dis=$(glpsol statement.mps --max --presol -o out.presol)
 rm -f protocol.presol
 echo $dis >> protocol.presol
 
-dis=$(glpsol main.mps --max --nopresol -o out.nopresol)
+dis=$(glpsol statement.mps --max --nopresol -o out.nopresol)
 rm -f protocol.nopresol
 echo $dis >> protocol.nopresol
+
+if g++ parser.cpp -o parser
+then
+./parser
+rm parser
+else
+echo "An error while compilation parser.cpp occured"
+exit 1
+fi
