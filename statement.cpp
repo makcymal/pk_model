@@ -144,8 +144,7 @@ int main() {
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
             if (dist[r][c] > 0 and c != src_idx and r != dst_idx) {
-                int cap = dist[r][c];
-                // int cap = ((r < 10 or c < 10) ? 3 : 2) * 150 * dist[r][c];
+                int cap = 2 * 20 * 70 * dist[r][c] / 60;
                 mps << " UP FLOW\t\t\t" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t\t" << cap << '\n';
                 mps << " LO FLOW\t\t\t" << abbrev[verts[r]] << '_' << abbrev[verts[c]] << "\t\t0\n";
             }

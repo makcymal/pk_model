@@ -44,9 +44,10 @@ int main() {
     map<string, string> abbrev;
     read_abbrev(abbrev);
 
-    ofstream graph_dot;
-    graph_dot.open("flows.dot");
-    graph_dot << "digraph {\n";
+    ofstream flows_dot, flows_txt;
+    flows_dot.open("flows.dot");
+    flows_dot << "digraph {\n";
+    flows_txt.open("flows.txt");
 
     ifstream table_file;
     table_file.open("out.presol");
@@ -67,13 +68,15 @@ int main() {
         ss >> bound;
 
         auto [from, to] = parse_edge(edge);
-        if (flow != 0)
-           graph_dot << '\t' << abbrev[from] << " -> " << abbrev[to] << " [label=\" " <<
-           flow << " / " << bound << "\",arrowsize=0.5,fontsize=8]\n";
+        if (flow != 0) {
+            flows_dot << '\t' << abbrev[from] << " -> " << abbrev[to] << " [label=\" " <<
+                flow << " / " << bound << "\",arrowsize=0.5,fontsize=8]\n";
+            flows_txt << abbrev[from] << ' ' << abbrev[to] << ' ' << flow << ' ' << bound << '\n'; 
+        }
     }
-    graph_dot << '}';
+    flows_dot << '}';
 
-    graph_dot.close();
+    flows_dot.close();
     table_file.close();
     return 0;
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if g++ statement.cpp -o statement
+if g++ statement.cpp -std=c++1z -o statement
 then
 ./statement
 rm statement
@@ -17,7 +17,7 @@ dis=$(glpsol statement.mps --max --nopresol -o out.nopresol)
 rm -f protocol.nopresol
 echo $dis >> protocol.nopresol
 
-if g++ parser.cpp -o parser
+if g++ parser.cpp -std=c++1z -o parser
 then
 ./parser
 rm parser
