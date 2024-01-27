@@ -44,9 +44,9 @@ int main() {
     map<string, string> abbrev;
     read_abbrev(abbrev);
 
-    ofstream flows_file;
-    flows_file.open("flows.csv");
-    flows_file << "Откуда\tкуда\tпоток\tограничение\n";
+    ofstream graph_dot;
+    graph_dot.open("flows.dot");
+    graph_dot << "digraph {\n";
 
     ifstream table_file;
     table_file.open("out.presol");
@@ -68,10 +68,12 @@ int main() {
 
         auto [from, to] = parse_edge(edge);
         if (flow != 0)
-           flows_file << abbrev[from] << '\t' << abbrev[to] << '\t' << flow << '\t' << bound << endl;
+           graph_dot << '\t' << abbrev[from] << " -> " << abbrev[to] << " [label=\" " <<
+           flow << " / " << bound << "\",arrowsize=0.5,fontsize=8]\n";
     }
+    graph_dot << '}';
 
-    flows_file.close();
+    graph_dot.close();
     table_file.close();
     return 0;
 }

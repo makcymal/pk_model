@@ -25,3 +25,5 @@ else
 echo "An error while compilation parser.cpp occured"
 exit 1
 fi
+
+dot -Tjpeg -Gdpi=300 -O flows.dot

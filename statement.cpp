@@ -66,6 +66,8 @@ void read_src_dst(string &src, string &dst) {
     ifstream src_dst_file;
     src_dst_file.open(PATH + "src_dst.txt");
     src_dst_file >> src >> dst;
+    if (src == "Артем") src = "Артём";
+    if (dst == "Артем") dst = "Артём";
     src_dst_file.close();
 }
 
