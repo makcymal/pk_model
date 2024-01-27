@@ -1,9 +1,0 @@
-A B 16
-A C 13
-B C 10
-B D 12
-C E 14
-D C 9
-E D 7
-D F 20
-E F 4
