@@ -10,4 +10,5 @@
 !pk_model/*.txt
 maxflow
 *Make*
+*make*
 !CMakeLists.txt
