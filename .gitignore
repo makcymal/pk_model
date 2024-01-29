@@ -6,3 +6,9 @@
 *.dot
 *.jpeg
 *.txt
+*.out
+!pk_model/*.txt
+maxflow
+*Make*
+!CMakeLists.txt
+!Makefile
