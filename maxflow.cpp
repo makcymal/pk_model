@@ -300,7 +300,7 @@ int main(int argc, char **argv) {
     write_mps(src, dst, to_abbrev);
 
     // call glpsol to solve it
-    system(("glpsol " + MPSFILE + " --max -o " + OUTPUTFILE).data());
+    system(("glpsol " + MPSFILE + " --max --nopresol -o " + OUTPUTFILE).data());
 
     // parse critical edges from glpsol solution
     parse_output(from_abbrev);
