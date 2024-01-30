@@ -140,13 +140,14 @@ void write_mps(mss &to_abbrev) {
     // describe matrix rows
     mps << "ROWS\n";
     // the first one is the target function with max flow value
-    mps << " N\tMAXX_FLOW\n";
+    mps << " N\tSOUR_MAXFLOW\n";
     // rows of vertices constraints
     for (auto &v: verts) {
-        mps << " E  IIOO_" << to_abbrev[v] << '\n';
+        mps << " E  IO_TOP__" << to_abbrev[v] << '\n';
+        mps << " E  IO_BOT__" << to_abbrev[v] << '\n';
     }
     // the same but for source and sink
-    mps << " E  OOOO_IIII\n";
+    mps << " E  OI_SOUR_SINK\n";
 
     // describe problem variables that are flow values at each edge
     mps << "COLUMNS\n";
@@ -156,13 +157,13 @@ void write_mps(mss &to_abbrev) {
 
     for (auto &v: verts) {
         string sour_edge = "\tSOUR_" + to_abbrev[v] + "\t\t";
-        mps << sour_edge << "MAXX_FLOW" << posone;
-        mps << sour_edge << "OOOO_IIII" << negone;
-        mps << sour_edge << "IIOO_" << to_abbrev[v] << posone;
+        mps << sour_edge << "SOUR_MAXFLOW" << posone;
+        mps << sour_edge << "OI_SOUR_SINK" << negone;
+        mps << sour_edge << "IO_TOP__" << to_abbrev[v] << posone;
 
         string sink_edge = "\t" + to_abbrev[v] + "_SINK" + "\t\t";
-        mps << sink_edge << "OOOO_IIII" << posone;
-        mps << sink_edge << "IIOO_" << to_abbrev[v] << negone;
+        mps << sink_edge << "OI_SOUR_SINK" << posone;
+        mps << sink_edge << "IO_BOT__" << to_abbrev[v] << negone;
     }
 
     for (int r = 0; r < N; ++r) {
@@ -171,8 +172,8 @@ void write_mps(mss &to_abbrev) {
             
             // constraints on flow saving: input sum have to be equal to output sum at each vertex
             string edge = "\t" + to_abbrev[verts[r]] + '_' + to_abbrev[verts[c]] + "\t\t";
-            mps << edge << "IIOO_" << to_abbrev[verts[r]] << negone;
-            mps << edge << "IIOO_" << to_abbrev[verts[c]] << posone;
+            mps << edge << "IO_TOP__" << to_abbrev[verts[r]] << negone;
+            mps << edge << "IO_BOT__" << to_abbrev[verts[c]] << posone;
         }
     }
 
@@ -182,11 +183,11 @@ void write_mps(mss &to_abbrev) {
 
     for (int i = 0; i < N; ++i) {
         string sour_edge = "SOUR_" + to_abbrev[verts[i]] + "\t\t";
-        mps << ub << sour_edge << bandwidth_marg[i] << endl;
+        mps << ub << sour_edge << 100000000 << endl;
         mps << lb << sour_edge << 0 << endl;
 
         string sink_edge = to_abbrev[verts[i]] + "_SINK" + "\t\t";
-        mps << ub << sink_edge << bandwidth_marg[i] << endl;
+        mps << ub << sink_edge << 100000000 << endl;
         mps << lb << sink_edge << 0 << endl;
     }
 
