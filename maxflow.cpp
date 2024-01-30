@@ -21,6 +21,11 @@ using mss = map<string, string>;
 using msi = map<string, int>;
 
 
+double sigmd(double x) {
+    return 1. / (1. + exp(-(x / 20000.))) * 1000.;
+}
+
+
 // each vertex name is assosiated with its abbreviation consisting of exactly 4 letters
 // they are listed in 'MODELPATH/abbreviations.txt" in following format "vertex_name abbreviation"
 // to_abbrev maps vertex name to its abbreviation, from_abbrev - vice versa
@@ -97,21 +102,36 @@ void read_graph(vs &verts, msi &popul, msi &index, vvi &dist) {
 }
 
 
-pair<vvi, vi> count_bandwidth(vvi &dist) {
+vvi count_bandwidth(vvi &dist) {
     vvi bandwidth;
-    vi bandwidth_marg;
-
     bandwidth.resize(dist.size());
-    bandwidth_marg.resize(dist.size(), 0);
     for (int r = 0; r < dist.size(); ++r) {
         bandwidth[r].resize(dist.size());
         for (int c = 0; c < dist.size(); ++c) {
             bandwidth[r][c] = 2 * 20 * 70 * dist[r][c] / 60;
-            bandwidth_marg[r] += bandwidth[r][c];
         }
     }
+    return bandwidth;
+}
 
-    return pair(bandwidth, bandwidth_marg);
+
+void draw_pk_graph(vs &verts, vvi &dist) {
+    ofstream dot;
+    dot.open("pk.dot");
+    dot << "digraph {\n";
+
+    for (int r = 0; r < dist.size(); ++r) {
+        for (int c = 0; c < dist.size(); ++c) {
+            if (dist[r][c] == 0) continue;
+            dot << '\t' << verts[r] << " -> " << verts[c] << " [label=\" " <<
+                dist[r][c] << "\",arrowsize=0.5,fontsize=8]\n";
+        }
+    }
+    
+    dot << "}\n";
+    dot.close();
+
+    system("dot -Tjpeg -Gdpi=300 -O pk.dot");
 }
 
 
@@ -126,10 +146,12 @@ void write_mps(mss &to_abbrev) {
     vvi dist;
     read_graph(verts, popul, index, dist);
 
-    // matrix of bandwidth of each edge
-    auto [bandwidth, bandwidth_marg] = count_bandwidth(dist);
+    // draw_pk_graph(verts, dist);
 
-    const int N = verts.size(), M = verts.size() / 2;
+    // matrix of bandwidth of each edge
+    auto bandwidth = count_bandwidth(dist);
+
+    const int N = verts.size();
 
     // result file
     ofstream mps;
@@ -140,13 +162,12 @@ void write_mps(mss &to_abbrev) {
     // describe matrix rows
     mps << "ROWS\n";
     // the first one is the target function with max flow value
-    mps << " N\t_MAXFLOW_\n";
+    mps << " N\t_MAX_FLOW_\n";
     // rows of vertices constraints
     for (auto &v: verts) {
-        mps << " E  _IO_" << to_abbrev[v] << "_\n";
+        mps << " E  _IN__" << to_abbrev[v] << "_\n";
+        mps << " E  _OUT_" << to_abbrev[v] << "_\n";
     }
-    // the same but for source and sink
-    mps << " E  _SRC_SNK_\n";
 
     // describe problem variables that are flow values at each edge
     mps << "COLUMNS\n";
@@ -154,28 +175,22 @@ void write_mps(mss &to_abbrev) {
     string negone = "_\t\t\t-1\n";
     string posone = "_\t\t\t1\n";
 
-    for (int i = 0; i < M; ++i) {
-        string sink_edge = "\t" + to_abbrev[verts[i]] + "_SINK" + "\t\t";
-        mps << sink_edge << "_SRC_SNK" << posone;
-        mps << sink_edge << "_IO_" << to_abbrev[verts[i]] << negone;
-    }
-
-    for (int i = M; i < N; ++i) {
-        string sour_edge = "\tSOUR_" + to_abbrev[verts[i]] + "\t\t";
-        mps << sour_edge << "_MAXFLOW" << posone;
-        mps << sour_edge << "_SRC_SNK" << negone;
-        mps << sour_edge << "_IO_" << to_abbrev[verts[i]] << posone;
-    }
-
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
             if (dist[r][c] == 0) continue;
             
             // constraints on flow saving: input sum have to be equal to output sum at each vertex
             string edge = "\t" + to_abbrev[verts[r]] + '_' + to_abbrev[verts[c]] + "\t\t";
-            mps << edge << "_IO_" << to_abbrev[verts[r]] << negone;
-            mps << edge << "_IO_" << to_abbrev[verts[c]] << posone;
+            mps << edge << "_MAX_FLOW" << posone;
+            mps << edge << "_OUT_" << to_abbrev[verts[r]] << negone;
+            mps << edge << "_IN__" << to_abbrev[verts[c]] << posone;
         }
+    }
+
+    for (int i = 0; i < N; ++i) {
+        string edge = "\tJUN__" + to_abbrev[verts[i]] + "\t\t";
+        mps << edge << "_IN__" << to_abbrev[verts[i]] << negone;
+        mps << edge << "_OUT_" << to_abbrev[verts[i]] << posone;
     }
 
     // variables (ie edges flows) bounds: 0 at the bottom and maxflow at the top
@@ -190,6 +205,13 @@ void write_mps(mss &to_abbrev) {
             mps << ub << edge << bandwidth[r][c] << endl;
             mps << lb << edge << 0 << endl;
         }
+    }
+
+    for (int i = 0; i < N; ++i) {
+        string edge = "JUN__" + to_abbrev[verts[i]] + "\t\t";
+        int jun = round(sigmd(popul[verts[i]]));
+        mps << ub << edge << jun << endl;
+        mps << lb << edge << 0 << endl;
     }
 
     mps << "ENDATA\n";
@@ -245,9 +267,11 @@ void parse_output(mss &from_abbrev) {
     // extract only Column, Activity, UB from each line
     string edge, tmpstr;
     int flow, bound;
-    for (int no = 1; table_file >> tmpstr; ++no) {
+    for (int no = 1; no <= 148; ++no) {
         // if the table suddenly ends
         // it becomes clear with the absense on No that is just integer
+        table_file >> tmpstr;
+
         if (tmpstr != to_string(no)) break;
 
         // read line word by word using stringstream
@@ -285,11 +309,11 @@ int main(int argc, char **argv) {
     // call glpsol to solve it
     system(("glpsol " + MPSFILE + " --max -o " + OUTPUTFILE).data());
 
-//     // parse critical edges from glpsol solution
-//     parse_output(from_abbrev);
-// 
-//     // call graphviz to draw graph of flows
-//     system(("dot -Tjpeg -Gdpi=300 -O " + DOTFILE).data());
+    // parse critical edges from glpsol solution
+    parse_output(from_abbrev);
+
+    // call graphviz to draw graph of flows
+    system(("dot -Tjpeg -Gdpi=300 -O " + DOTFILE).data());
 
     return 0;
 }
