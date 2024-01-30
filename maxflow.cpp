@@ -115,14 +115,6 @@ pair<vvi, vi> count_bandwidth(vvi &dist) {
 }
 
 
-double sigmoid(ofstream &sigmd, double x) {
-    sigmd << "popul: " << x << endl;
-    sigmd << "sigmd: " << 1.0 / (1.0 + exp(-(x / 50000.0 - 2.0))) << endl;
-    sigmd << "round: " << round(1.0 / (1.0 + exp(-(x / 50000.0 - 2.0))) * 1000) << endl << endl;
-    return 1.0 / (1.0 + exp(-(x / 50000.0 - 2.5)));
-}
-
-
 // write mps file with problem statement that will be used by glpsol
 void write_mps(mss &to_abbrev) {
     // verts is the list of vertices full names
@@ -137,7 +129,7 @@ void write_mps(mss &to_abbrev) {
     // matrix of bandwidth of each edge
     auto [bandwidth, bandwidth_marg] = count_bandwidth(dist);
 
-    const int N = verts.size();
+    const int N = verts.size(), M = verts.size() / 2;
 
     // result file
     ofstream mps;
@@ -148,30 +140,31 @@ void write_mps(mss &to_abbrev) {
     // describe matrix rows
     mps << "ROWS\n";
     // the first one is the target function with max flow value
-    mps << " N\tMAX__FLOW\n";
+    mps << " N\t_MAXFLOW_\n";
     // rows of vertices constraints
     for (auto &v: verts) {
-        mps << " E  RECV_" << to_abbrev[v] << '\n';
-        mps << " E  SEND_" << to_abbrev[v] << '\n';
+        mps << " E  _IO_" << to_abbrev[v] << "_\n";
     }
     // the same but for source and sink
-    mps << " E  SOUR_SINK\n";
+    mps << " E  _SRC_SNK_\n";
 
     // describe problem variables that are flow values at each edge
     mps << "COLUMNS\n";
 
-    string negone = "\t\t\t-1\n";
-    string posone = "\t\t\t1\n";
+    string negone = "_\t\t\t-1\n";
+    string posone = "_\t\t\t1\n";
 
-    for (auto &v: verts) {
-        string sour_edge = "\tSOUR_" + to_abbrev[v] + "\t\t";
-        mps << sour_edge << "MAX__FLOW" << posone;
-        mps << sour_edge << "SOUR_SINK" << negone;
-        mps << sour_edge << "RECV_" << to_abbrev[v] << posone;
+    for (int i = 0; i < M; ++i) {
+        string sink_edge = "\t" + to_abbrev[verts[i]] + "_SINK" + "\t\t";
+        mps << sink_edge << "_SRC_SNK" << posone;
+        mps << sink_edge << "_IO_" << to_abbrev[verts[i]] << negone;
+    }
 
-        string sink_edge = "\t" + to_abbrev[v] + "_SINK" + "\t\t";
-        mps << sink_edge << "SOUR_SINK" << posone;
-        mps << sink_edge << "SEND_" << to_abbrev[v] << negone;
+    for (int i = M; i < N; ++i) {
+        string sour_edge = "\tSOUR_" + to_abbrev[verts[i]] + "\t\t";
+        mps << sour_edge << "_MAXFLOW" << posone;
+        mps << sour_edge << "_SRC_SNK" << negone;
+        mps << sour_edge << "_IO_" << to_abbrev[verts[i]] << posone;
     }
 
     for (int r = 0; r < N; ++r) {
@@ -180,37 +173,14 @@ void write_mps(mss &to_abbrev) {
             
             // constraints on flow saving: input sum have to be equal to output sum at each vertex
             string edge = "\t" + to_abbrev[verts[r]] + '_' + to_abbrev[verts[c]] + "\t\t";
-            mps << edge << "SEND_" << to_abbrev[verts[r]] << negone;
-            mps << edge << "RECV_" << to_abbrev[verts[c]] << posone;
+            mps << edge << "_IO_" << to_abbrev[verts[r]] << negone;
+            mps << edge << "_IO_" << to_abbrev[verts[c]] << posone;
         }
-    }
-
-    for (int i = 0; i < N; ++i) {
-        string edge = "\tBAND_" + to_abbrev[verts[i]] + "\t\t";
-        mps << edge << "SEND_" << to_abbrev[verts[i]] << posone;
-        mps << edge << "RECV_" << to_abbrev[verts[i]] << negone;
     }
 
     // variables (ie edges flows) bounds: 0 at the bottom and maxflow at the top
     mps << "BOUNDS\n";
     string ub = " UP FLOW\t\t\t", lb = " LO FLOW\t\t\t";
-
-    ofstream sigmd;
-    sigmd.open("sigmoid.txt");
-
-    for (int i = 0; i < N; ++i) {
-        string sour_edge = "SOUR_" + to_abbrev[verts[i]] + "\t\t";
-        mps << ub << sour_edge << bandwidth_marg[i] << endl;
-        mps << lb << sour_edge << 0 << endl;
-
-        string sink_edge = to_abbrev[verts[i]] + "_SINK" + "\t\t";
-        mps << ub << sink_edge << bandwidth_marg[i] << endl;
-        mps << lb << sink_edge << 0 << endl;
-
-        string band_edge = "BAND_" + to_abbrev[verts[i]] + "\t\t";
-        mps << ub << band_edge << round(sigmoid(sigmd, popul[verts[i]]) * 1000) << endl;
-        mps << lb << band_edge << 0 << endl;
-    }
 
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
