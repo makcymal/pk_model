@@ -12,10 +12,19 @@ const string OUTPUTFILE = "solution.out";
 const string DOTFILE = "flows.dot";
 
 
+using pii = pair<int, int>;
+using vi = vector<int>;
+using vvi = vector<vector<int>>;
+using pss = pair<string, string>;
+using vs = vector<string>;
+using mss = map<string, string>;
+using msi = map<string, int>;
+
+
 // each vertex name is assosiated with its abbreviation consisting of exactly 4 letters
 // they are listed in 'MODELPATH/abbreviations.txt" in following format "vertex_name abbreviation"
 // to_abbrev maps vertex name to its abbreviation, from_abbrev - vice versa
-void read_abbrev(map<string, string> &to_abbrev, map<string, string> &from_abbrev) {
+void read_abbrev(mss &to_abbrev, mss &from_abbrev) {
     ifstream abbrev_file;
     abbrev_file.open(MODELPATH + "abbreviations.txt");
     // full vertex name and its abbreviation
@@ -35,58 +44,12 @@ void read_abbrev(map<string, string> &to_abbrev, map<string, string> &from_abbre
 }
 
 
-// check whether vertex given by user is valid
-// vertex is valid if its listed in abbreviations 
-void approve_vert(string &vert, map<string, string> &to_abbrev) {
-    // there must be only one name for it
-    if (vert == "Артем") vert = "Артём";
-    // if the name is unknown then decline it by assigning to empty string
-    if (to_abbrev.count(vert) == 0)
-        vert = "";
-}
-
-
-// read source and destination vertex given by user
-pair<string, string> read_src_dst(int argc, char **argv, map<string, string> &to_abbrev) {
-    // first try to read from 'src_dst.txt'
-    string file_src, file_dst;
-    // if the file is not present ignore it
-    try {
-        ifstream src_dst_file;
-        src_dst_file.open("src_dst.txt");
-        // source and destination are assumed to be listed one by one
-        src_dst_file >> file_src >> file_dst;
-        // check whether they are valid
-        approve_vert(file_src, to_abbrev);
-        approve_vert(file_dst, to_abbrev);
-        src_dst_file.close();
-    }
-    catch (const exception &e) {}
-
-    // try to read source and destination from command line arguments and check them
-    auto arg_src = (argc >= 2 ? string(argv[1]) : "");
-    approve_vert(arg_src, to_abbrev);
-    auto arg_dst = (argc >= 3 ? string(argv[2]) : "");
-    approve_vert(arg_dst, to_abbrev);
-
-    // if finally there is no valid source or destination print message about it and exit with error
-    if ((file_src == "" and arg_src == "") or (file_dst == "" and arg_dst == "")) {
-        clog << "No source or destination was given, shutdown\n";
-        clog << "Provide source and destination in \'" << MODELPATH << "src_dst.txt\' or via command line arguments\n";
-        exit(1);
-    }
-
-    // command line args have higher priority
-    return {(arg_src != "") ? arg_src : file_src, (arg_dst != "") ? arg_dst : file_dst};
-}
-
-
 // read all the vertices and edges of PK graph
 // verts is the list of vertices full names
 // popul contains population numbers by vertex full name
 // index maps vertex full name to its index in verts
 // dist is the matrix of distances where 0 means there is no straight road
-void read_graph(vector<string> &verts, map<string, int> &popul, map<string, int> &index, vector<vector<int>> &dist) {
+void read_graph(vs &verts, msi &popul, msi &index, vvi &dist) {
     string str_input;
     int int_input;
 
@@ -105,7 +68,9 @@ void read_graph(vector<string> &verts, map<string, int> &popul, map<string, int>
     }
 
     // sort by population in descending order
-    sort(verts.begin(), verts.end(), [&](string &a, string &b) { return popul[a] > popul[b]; });
+    sort(verts.begin(), verts.end(), [&](string &a, string &b) {
+        return popul[a] > popul[b]; 
+    });
 
     // get vertices sorted indices
     for (int i = 0; i < verts.size(); ++i)
@@ -132,77 +97,106 @@ void read_graph(vector<string> &verts, map<string, int> &popul, map<string, int>
 }
 
 
+pair<vvi, vi> count_bandwidth(vvi &dist) {
+    vvi bandwidth;
+    vi bandwidth_marg;
+
+    bandwidth.resize(dist.size());
+    bandwidth_marg.resize(dist.size(), 0);
+    for (int r = 0; r < dist.size(); ++r) {
+        bandwidth[r].resize(dist.size());
+        for (int c = 0; c < dist.size(); ++c) {
+            bandwidth[r][c] = 2 * 20 * 70 * dist[r][c] / 60;
+            bandwidth_marg[r] += bandwidth[r][c];
+        }
+    }
+
+    return pair(bandwidth, bandwidth_marg);
+}
+
+
 // write mps file with problem statement that will be used by glpsol
-void write_mps(string &src, string &dst, map<string, string> &to_abbrev) {
+void write_mps(mss &to_abbrev) {
     // verts is the list of vertices full names
     // popul contains population numbers by vertex full name
     // index maps vertex full name to its index in verts
     // dist is the matrix of distances where 0 means there is no straight road
-    vector<string> verts;
-    map<string, int> popul, index;
-    vector<vector<int>> dist;
+    vs verts;
+    msi popul, index;
+    vvi dist;
     read_graph(verts, popul, index, dist);
 
+    // matrix of bandwidth of each edge
+    auto [bandwidth, bandwidth_marg] = count_bandwidth(dist);
+
     const int N = verts.size();
-    // source and destination indices in verts
-    int src_idx = index[src], dst_idx = index[dst];
 
     // result file
     ofstream mps;
     mps.open(MPSFILE);
 
     // problem name
-    mps << "NAME          PK_ROADS\n";
+    mps << "NAME          PK_FLOWS\n";
     // describe matrix rows
     mps << "ROWS\n";
     // the first one is the target function with max flow value
-    mps << " N\tMAXFLOW\n";
+    mps << " N\tMAXX_FLOW\n";
     // rows of vertices constraints
-    for (int i = 0; i < N; ++i) {
-        if (i != src_idx and i != dst_idx)
-            mps << " E  IO_" << to_abbrev[verts[i]] << '\n';
+    for (auto &v: verts) {
+        mps << " E  IIOO_" << to_abbrev[v] << '\n';
     }
-    // the same but for source and destination
-    mps << " E  SRC_DST\n";
+    // the same but for source and sink
+    mps << " E  OOOO_IIII\n";
 
     // describe problem variables that are flow values at each edge
     mps << "COLUMNS\n";
+
+    string negone = "\t\t\t-1\n";
+    string posone = "\t\t\t1\n";
+
+    for (auto &v: verts) {
+        string sour_edge = "\tSOUR_" + to_abbrev[v] + "\t\t";
+        mps << sour_edge << "MAXX_FLOW" << posone;
+        mps << sour_edge << "OOOO_IIII" << negone;
+        mps << sour_edge << "IIOO_" << to_abbrev[v] << posone;
+
+        string sink_edge = "\t" + to_abbrev[v] + "_SINK" + "\t\t";
+        mps << sink_edge << "OOOO_IIII" << posone;
+        mps << sink_edge << "IIOO_" << to_abbrev[v] << negone;
+    }
+
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
-            if (dist[r][c] > 0 and c != src_idx and r != dst_idx) {
-                string var = "\t" + to_abbrev[verts[r]] + '_' + to_abbrev[verts[c]] + "\t\t";
-
-                // if edge begins in source then it should be counted in target MAXFLOW variable
-                if (r == src_idx){
-                    mps << var << "MAXFLOW\t\t\t1\n";
-                    if (c == dst_idx) continue;
-                }
-                
-                // constraints on flow saving: input sum have to be equal to output sum at each vertex except src, dst
-                // in case of src, dst the source output have to be equal to destination input
-                if (r != src_idx and c != dst_idx){
-                    mps << var << "IO_" << to_abbrev[verts[r]] << "\t\t\t-1\n";
-                    mps << var << "IO_" << to_abbrev[verts[c]] << "\t\t\t1\n";
-                } else if (r == src_idx) {
-                    mps << var << "SRC_DST" << "\t\t\t-1\n";
-                    mps << var << "IO_" << to_abbrev[verts[c]] << "\t\t\t1\n";
-                } else if (c == dst_idx) {
-                    mps << var << "IO_" << to_abbrev[verts[r]] << "\t\t\t-1\n";
-                    mps << var << "SRC_DST" << "\t\t\t1\n";
-                }
-            }
+            if (dist[r][c] == 0) continue;
+            
+            // constraints on flow saving: input sum have to be equal to output sum at each vertex
+            string edge = "\t" + to_abbrev[verts[r]] + '_' + to_abbrev[verts[c]] + "\t\t";
+            mps << edge << "IIOO_" << to_abbrev[verts[r]] << negone;
+            mps << edge << "IIOO_" << to_abbrev[verts[c]] << posone;
         }
     }
 
     // variables (ie edges flows) bounds: 0 at the bottom and maxflow at the top
     mps << "BOUNDS\n";
+    string ub = " UP FLOW\t\t\t", lb = " LO FLOW\t\t\t";
+
+    for (int i = 0; i < N; ++i) {
+        string sour_edge = "SOUR_" + to_abbrev[verts[i]] + "\t\t";
+        mps << ub << sour_edge << bandwidth_marg[i] << endl;
+        mps << lb << sour_edge << 0 << endl;
+
+        string sink_edge = to_abbrev[verts[i]] + "_SINK" + "\t\t";
+        mps << ub << sink_edge << bandwidth_marg[i] << endl;
+        mps << lb << sink_edge << 0 << endl;
+    }
+
     for (int r = 0; r < N; ++r) {
         for (int c = 0; c < N; ++c) {
-            if (dist[r][c] > 0 and c != src_idx and r != dst_idx) {
-                int cap = 2 * 20 * 70 * dist[r][c] / 60;
-                mps << " UP FLOW\t\t\t" << to_abbrev[verts[r]] << '_' << to_abbrev[verts[c]] << "\t\t" << cap << '\n';
-                mps << " LO FLOW\t\t\t" << to_abbrev[verts[r]] << '_' << to_abbrev[verts[c]] << "\t\t0\n";
-            }
+            if (dist[r][c] == 0) continue;
+
+            string edge = to_abbrev[verts[r]] + '_' + to_abbrev[verts[c]] + "\t\t";
+            mps << ub << edge << bandwidth[r][c] << endl;
+            mps << lb << edge << 0 << endl;
         }
     }
 
@@ -228,7 +222,7 @@ void ignorewhile(ifstream &input, string stop) {
 
 
 // parse edge of the following format 'FROM_TO' into to vertices
-pair<string,string> parse_edge(string &edge) {
+pss parse_edge(string &edge) {
     string from = edge.substr(0, 4), to = edge.substr(5, 4);
     return {from, to};
 }
@@ -236,7 +230,7 @@ pair<string,string> parse_edge(string &edge) {
 
 // parse glpsol solution
 // specifically extract critical edges (having flow > 0)
-void parse_output(map <string, string> &from_abbrev) {
+void parse_output(mss &from_abbrev) {
     // the first one will be in format for graphviz, the second one in human-readable form
     ofstream flows_dot, flows_txt;
     flows_dot.open(DOTFILE);
@@ -290,23 +284,20 @@ void parse_output(map <string, string> &from_abbrev) {
 
 int main(int argc, char **argv) {
     // maps from full vertices names to abbreviations and vice versa
-    map<string, string> to_abbrev, from_abbrev;
+    mss to_abbrev, from_abbrev;
     read_abbrev(to_abbrev, from_abbrev);
 
-    // get source and destination by their names
-    // it will exit with error if any of them isnt presented
-    auto [src, dst] = read_src_dst(argc, argv, to_abbrev);
     // generate LP problem statement for glpsol
-    write_mps(src, dst, to_abbrev);
+    write_mps(to_abbrev);
 
     // call glpsol to solve it
     system(("glpsol " + MPSFILE + " --max -o " + OUTPUTFILE).data());
 
-    // parse critical edges from glpsol solution
-    parse_output(from_abbrev);
-
-    // call graphviz to draw graph of flows
-    system(("dot -Tjpeg -Gdpi=300 -O " + DOTFILE).data());
+//     // parse critical edges from glpsol solution
+//     parse_output(from_abbrev);
+// 
+//     // call graphviz to draw graph of flows
+//     system(("dot -Tjpeg -Gdpi=300 -O " + DOTFILE).data());
 
     return 0;
 }
