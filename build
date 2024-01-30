@@ -9,3 +9,4 @@ rm Makefile
 
 ./maxflow
 rm maxflow
+rm flows.dot

@@ -22,7 +22,7 @@ using msi = map<string, int>;
 
 
 double sigmd(double x) {
-    return 1. / (1. + exp(-(x / 20000.))) * 1000.;
+    return 1. / (1. + exp(-(x / 20000.))) * 10000.;
 }
 
 
@@ -115,26 +115,6 @@ vvi count_bandwidth(vvi &dist) {
 }
 
 
-void draw_pk_graph(vs &verts, vvi &dist) {
-    ofstream dot;
-    dot.open("pk.dot");
-    dot << "digraph {\n";
-
-    for (int r = 0; r < dist.size(); ++r) {
-        for (int c = 0; c < dist.size(); ++c) {
-            if (dist[r][c] == 0) continue;
-            dot << '\t' << verts[r] << " -> " << verts[c] << " [label=\" " <<
-                dist[r][c] << "\",arrowsize=0.5,fontsize=8]\n";
-        }
-    }
-    
-    dot << "}\n";
-    dot.close();
-
-    system("dot -Tjpeg -Gdpi=300 -O pk.dot");
-}
-
-
 // write mps file with problem statement that will be used by glpsol
 void write_mps(mss &to_abbrev) {
     // verts is the list of vertices full names
@@ -145,8 +125,6 @@ void write_mps(mss &to_abbrev) {
     msi popul, index;
     vvi dist;
     read_graph(verts, popul, index, dist);
-
-    // draw_pk_graph(verts, dist);
 
     // matrix of bandwidth of each edge
     auto bandwidth = count_bandwidth(dist);
@@ -286,9 +264,9 @@ void parse_output(mss &from_abbrev) {
         // write extracted info to flows files
         auto [from, to] = parse_edge(edge);
         if (flow != 0) {
-            flows_dot << '\t' << from_abbrev[from] << " -> " << from_abbrev[to] << " [label=\" " <<
-                flow << " / " << bound << "\",arrowsize=0.5,fontsize=8]\n";
-            flows_txt << from_abbrev[from] << ' ' << from_abbrev[to] << ' ' << flow << ' ' << bound << '\n'; 
+            flows_dot << '\t' << from << " -> " << to << " [label=\" " <<
+                flow << "\",arrowsize=0.5,fontsize=12]\n";
+            flows_txt << from_abbrev[from] << '-' << from_abbrev[to] << " & " << flow << " \\\\\n"; 
         }
     }
     flows_dot << '}';
